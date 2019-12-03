@@ -224,8 +224,9 @@
     (->> (for [k ks] [k (get @threads-by-participants k)])
          (into {}))))
 
-(def thread-garcia (get @threads-by-participants #{"Victor Gil" "Leandro Garcia"}))
-(def thread-bonnie (get @threads-by-participants #{"Victor Gil" "Victoria Noya"}))
-(def thread-cachete (get @threads-by-participants #{"Victor Gil" "Camilo Falco"}))
-(def thread-biyu (get @threads-by-participants #{"Victor Gil" "Federico O'Neill"}))
-(def thread-paula (get @threads-by-participants #{"Victor Gil" "Paula Lorenzo"}))
+(comment
+ (def thread-garcia (get @threads-by-participants #{"Victor Gil" "Leandro Garcia"}))
+ (def thread-bonnie (get @threads-by-participants #{"Victor Gil" "Victoria Noya"}))
+ (def thread-cachete (get @threads-by-participants #{"Victor Gil" "Camilo Falco"}))
+ (def thread-biyu (get @threads-by-participants #{"Victor Gil" "Federico O'Neill"}))
+ (def thread-paula (get @threads-by-participants #{"Victor Gil" "Paula Lorenzo"})))
