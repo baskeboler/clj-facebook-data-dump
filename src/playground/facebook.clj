@@ -361,4 +361,9 @@
        (specter/transform ALL (fn [o] (->> o ts/children first ts/attributes :src (str facebook-files-path "/"))))))
        ;; (specter/select [ALL #(string/starts-with? % (str facebook-files-path "/messages/photos"))])))
 
-(defn get-thread-image-count)
+(defn copy-thread-images-to-folder [threads folder-name]
+  (let [parent (io/file folder-name)
+        images (get-all-thread-images threads)]
+    (.mkdir parent)
+    (doseq [[n f] (map-indexed (fn [i fpath] [i (io/file fpath)]) images)]
+      (io/copy f (io/file parent (apply str n (take-last 4 (.getName f))))))))
