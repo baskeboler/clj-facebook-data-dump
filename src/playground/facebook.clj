@@ -5,20 +5,14 @@
             [clojure.core.reducers :as reducers]
             [pl.danieljanus.tagsoup :as ts]
             [taoensso.timbre :as log]
-            [clojure.data.xml :as xml])
+            [clojure.data.xml :as xml]
+            [playground.protocols :as protocols :refer [PText PWords PMessageThread]])
   (:import [java.io File]
            [com.kennycason.kumo WordFrequency  CollisionMode WordCloud]
            [com.kennycason.kumo.nlp FrequencyAnalyzer]
            [com.kennycason.kumo.palette ColorPalette]
            [com.kennycason.kumo.font.scale LinearFontScalar]
            [java.awt Color Dimension]))
-
-(defprotocol PText
-  (get-text [this]))
-
-(defprotocol PWords
-  (get-words [this]))
-
 (defn hash-code [obj]
   (.hashCode obj))
 
@@ -122,7 +116,7 @@
   (get-text [this]
     (->> (:text this)
          (filter is-text-node?)
-         (map get-text)
+         (map get-node-text)
          string/join)))
 
 (defn create-message [args]
@@ -194,13 +188,6 @@
            get-word-list))))
          
 
-(defprotocol PMessageThread
-  (get-participants [this])
-  (get-message-count [this])
-  (get-thread-summary [this])
-  (get-images [this])
-  (get-word-frequencies [this]))
-
 (defrecord MessageThread [messages]
   PMessageThread
   (get-participants [this]
@@ -215,13 +202,13 @@
   (get-thread-summary [this]
     (if (:thread-summary this)
       (:thread-summary this)
-      {:participants  (get-participants this)
-       :message-count (get-message-count this)}))
+      {:participants  (protocols/get-participants this)
+       :message-count (protocols/get-message-count this)}))
   (get-word-frequencies [this]
     (if (:word-frequencies this)
       (:word-frequencies this)
       (->>
-       (for [[word freq] (frequencies (get-words this))]
+       (for [[word freq] (frequencies (protocols/get-words this))]
          {:word word :frequency freq})
        (sort-by :frequency))))
   (get-images [this]
@@ -233,16 +220,8 @@
       (->> (:messages this)
            (map :text)
            (apply concat)
-           (map get-words)
+           (map protocols/get-words)
            (apply concat)))))
-           ;; (filter (comp is-p-node? first))
-                    ;; flatten
-           ;; (map (comp first ts/children))
-           ;; (apply str)
-           ;; #(string/split % #" ")
-                    ;; (map (comp #(string/split % #" ") first ts/children))
-           ;; (map (comp string/lower-case remove-non-letters))
-           ;; (filter #(> (count %) 3))))))
 
 (def processed-thread-files (atom #{}))
 (def threads-by-participants (atom {}))
@@ -272,7 +251,7 @@
   (let [ch (chan 100)]
     (go-loop [[th the-chan] (async/alts! [message-chan ch])]
       (when      th
-        (let [summary (get-thread-summary th)]
+        (let [summary (protocols/get-thread-summary th)]
           (log/info summary)
           (swap! threads-by-participants assoc (:participants summary) (-> th
                                                                            (assoc :participants (:participants summary))
@@ -300,13 +279,6 @@
   (let [ks (filter #(% name) (keys @threads-by-participants))]
     (->> (for [k ks] [k (get @threads-by-participants k)])
          (into {}))))
-
-(comment
-  (def thread-garcia (get @threads-by-participants #{"Victor Gil" "Leandro Garcia"}))
-  (def thread-bonnie (get @threads-by-participants #{"Victor Gil" "Victoria Noya"}))
-  (def thread-cachete (get @threads-by-participants #{"Victor Gil" "Camilo Falco"}))
-  (def thread-biyu (get @threads-by-participants #{"Victor Gil" "Federico O'Neill"}))
-  (def thread-paula (get @threads-by-participants #{"Victor Gil" "Paula Lorenzo"})))
 
 (defn read-message-index []
   (let [f (slurp (File. facebook-files-path "html/messages.htm"))
@@ -339,9 +311,9 @@
 
 (defn print-thread-list [threads]
   (let [rows (map (fn [th]
-                    {:participants (->> (get-participants th)
+                    {:participants (->> (protocols/get-participants th)
                                         (string/join ", "))
-                     :messages (get-message-count th)})
+                     :messages (protocols/get-message-count th)})
                   threads)]
     (clojure.pprint/print-table rows)))
 (def thread-leandro (get-message-threads "Leandro Garcia"))
@@ -354,8 +326,8 @@
       (string/replace #" " "_")))
 
 (defn message-thread-word-cloud [message-thread]
-  (let [ppl (get-participants message-thread)
+  (let [ppl (protocols/get-participants message-thread)
         file-name (str "wc-" (string/join "-" (map snake-case ppl)) ".png")
-        words (get-words message-thread)]
+        words (protocols/get-words message-thread)]
     (create-word-cloud words file-name)))
                          
