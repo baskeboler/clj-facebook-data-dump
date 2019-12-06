@@ -6,7 +6,8 @@
             [pl.danieljanus.tagsoup :as ts]
             [taoensso.timbre :as log]
             [clojure.data.xml :as xml]
-            [playground.protocols :as protocols :refer [PText PWords PMessageThread]])
+            [playground.protocols :as protocols :refer [PText PWords PMessage PMessageThread]]
+            [com.rpl.specter :as specter :refer :all])
   (:import [java.io File]
            [com.kennycason.kumo WordFrequency  CollisionMode WordCloud]
            [com.kennycason.kumo.nlp FrequencyAnalyzer]
@@ -72,7 +73,7 @@
   (keyword? (ts/tag node)))
 (defn get-css-class [node]
   (:class (ts/attributes node)))
-(defn select-first [pred]
+(defn select-first-node [pred]
   (fn [node]
     (loop [res       node
            remaining []]
@@ -83,11 +84,11 @@
               r   (first rem)
               rem (rest rem)]
           (recur r rem))))))
-(def get-thread (select-first #(= "thread" (get-css-class %))))
-(def get-user-node (select-first #(and (= :span (ts/tag %))
-                                       (= "user" (get-css-class %)))))
-(def get-timestamp-node (select-first #(and (= :span (ts/tag %))
-                                            (= "meta" (get-css-class %)))))
+(def get-thread (select-first-node #(= "thread" (get-css-class %))))
+(def get-user-node (select-first-node #(and (= :span (ts/tag %))
+                                            (= "user" (get-css-class %)))))
+(def get-timestamp-node (select-first-node #(and (= :span (ts/tag %))
+                                                 (= "meta" (get-css-class %)))))
 
 (defn is-message-node? [node]
   (and (= :div (ts/tag node))
@@ -96,9 +97,23 @@
 (defn tag-selector [tag]
   (fn [node]
     (= tag (ts/tag node))))
+(defn tag-container [tag]
+  (fn [node]
+    (cond
+      (nil? node) false
+      (= tag (ts/tag node)) true
+      :otherwise (loop [children (ts/children node)]
+                   (if (empty? children)
+                     false
+                     (let [f (first children)]
+                       (if (= tag (ts/tag f))
+                         true
+                         (recur (rest children)))))))))
 
 (def is-img-node? (tag-selector :img))
 (def is-p-node? (tag-selector :p))
+
+(def has-img-node? (tag-container :img))
 
 (defn get-img-path [img-node]
   (assert (is-img-node? img-node))
@@ -106,7 +121,7 @@
 
 (defn get-node-text [node]
   ;; (assert (is-text-node? node))
-  (let [chs  (ts/children node)]
+  (let [chs (ts/children node)]
     (if-not (empty? chs)
       (first chs)
       "")))
@@ -117,7 +132,13 @@
     (->> (:text this)
          (filter is-text-node?)
          (map get-node-text)
-         string/join)))
+         string/join))
+  PMessage
+  (has-image? [this]
+    (some has-img-node? (:text this)))
+  (get-images [this]
+    (->> (:text this)
+         (filter is-img-node?))))
 
 (defn create-message [args]
   (let [header (first args)
@@ -140,9 +161,12 @@
   (reducers/fold combine-message   reduce-messages nodes))
 
 (declare ->MessageThread)
+(defn file-name [^java.io.File f] (.getAbsolutePath f))
 
 (defn parse-message-file [f]
+  (log/debug "Parsing DOM in " (file-name f))
   (let [dom (ts/parse f)]
+    (log/debug "Done parsing DOM for " (file-name f))
     (->> dom
          get-thread
          ts/children
@@ -152,7 +176,6 @@
          (mapv create-message)
          ->MessageThread)))
 
-(defn file-name [^java.io.File f] (.getAbsolutePath f))
 (defn is-message-file? [^java.io.File f]
   (let [p (file-name f)]
     (and (string/includes? p "/messages/")
@@ -177,7 +200,7 @@
   (when (string? the-string)
     (->> (string/split the-string #" ")
          (map (comp string/lower-case remove-non-letters))
-         (filter #(> (count %) 2))))) 
+         (filter #(> (count %) 2)))))
 (extend-protocol PWords
   clojure.lang.PersistentVector
   (get-words [this]
@@ -186,7 +209,6 @@
            ts/children
            first
            get-word-list))))
-         
 
 (defrecord MessageThread [messages]
   PMessageThread
@@ -307,8 +329,10 @@
 (defn get-message-threads [name]
   (let [paths (get message-index name)]
     (when-let  [abs-paths (map #(str facebook-files-path "/" %) paths)]
-      (map (comp parse-message-file #(File. %)) abs-paths))))
-
+      (let [loaded-threads (map (comp parse-message-file #(File. %)) abs-paths)
+            loaded-th-idx  (into {} (for [th loaded-threads] [(protocols/get-participants th) th]))]
+        (swap! threads-by-participants merge loaded-th-idx)
+        loaded-threads))))
 (defn print-thread-list [threads]
   (let [rows (map (fn [th]
                     {:participants (->> (protocols/get-participants th)
@@ -317,7 +341,6 @@
                   threads)]
     (clojure.pprint/print-table rows)))
 (def thread-leandro (get-message-threads "Leandro Garcia"))
-
 
 (defn snake-case [the-str]
   (-> the-str
@@ -330,4 +353,12 @@
         file-name (str "wc-" (string/join "-" (map snake-case ppl)) ".png")
         words (protocols/get-words message-thread)]
     (create-word-cloud words file-name)))
-                         
+
+
+(defn get-all-thread-images [thread-list]
+  (->> (if (seq? thread-list) thread-list [thread-list])
+       (specter/select [ALL :messages ALL protocols/has-image? :text ALL #(not-empty (ts/children %))])
+       (specter/transform ALL (fn [o] (->> o ts/children first ts/attributes :src (str facebook-files-path "/"))))))
+       ;; (specter/select [ALL #(string/starts-with? % (str facebook-files-path "/messages/photos"))])))
+
+(defn get-thread-image-count)

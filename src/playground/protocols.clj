@@ -14,3 +14,7 @@
   (get-images [this])
   (get-word-frequencies [this]))
 
+(defprotocol PMessage
+  (has-image? [this])
+  (get-images [this]))
+
