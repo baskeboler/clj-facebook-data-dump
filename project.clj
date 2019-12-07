@@ -6,6 +6,7 @@
   :dependencies [[org.clojure/clojure "1.10.1"]
                  [org.clojure/data.xml "0.0.8"]
                  [com.taoensso/timbre "4.10.0"]
+                 [org.clojure/tools.cli "0.4.2"]
                  [com.rpl/specter "1.1.3"]
                  [clj-tagsoup/clj-tagsoup "0.3.0"]
                  [org.clojure/core.async "0.5.527"]

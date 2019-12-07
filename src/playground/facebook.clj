@@ -52,9 +52,9 @@
       (.build freqs)
       (.writeToFile outfile))))
 
-(def facebook-files-path "/home/victor/Documents/fb")
-
-(def f (io/file facebook-files-path))
+(def facebook-files-path (atom "/home/victor/Documents/fb"))
+(defn set-facebook-path [p] (reset! facebook-files-path p))
+(def f (io/file @facebook-files-path))
 
 (def fs (file-seq f))
 
@@ -303,7 +303,7 @@
          (into {}))))
 
 (defn read-message-index []
-  (let [f (slurp (File. facebook-files-path "html/messages.htm"))
+  (let [f (slurp (File. @facebook-files-path "html/messages.htm"))
         dom (ts/parse-string f)
         get-item-name (fn [item] (->> item ts/children first ts/children first))
         get-item-path (fn [item] (->> item ts/children first ts/attributes :href))
@@ -328,7 +328,7 @@
 
 (defn get-message-threads [name]
   (let [paths (get message-index name)]
-    (when-let  [abs-paths (map #(str facebook-files-path "/" %) paths)]
+    (when-let  [abs-paths (map #(str @facebook-files-path "/" %) paths)]
       (let [loaded-threads (map (comp parse-message-file #(File. %)) abs-paths)
             loaded-th-idx  (into {} (for [th loaded-threads] [(protocols/get-participants th) th]))]
         (swap! threads-by-participants merge loaded-th-idx)
@@ -340,7 +340,7 @@
                      :messages (protocols/get-message-count th)})
                   threads)]
     (clojure.pprint/print-table rows)))
-(def thread-leandro (get-message-threads "Leandro Garcia"))
+#_(def thread-leandro (get-message-threads "Leandro Garcia"))
 
 (defn snake-case [the-str]
   (-> the-str
@@ -358,7 +358,7 @@
 (defn get-all-thread-images [thread-list]
   (->> (if (seq? thread-list) thread-list [thread-list])
        (specter/select [ALL :messages ALL protocols/has-image? :text ALL #(not-empty (ts/children %))])
-       (specter/transform ALL (fn [o] (->> o ts/children first ts/attributes :src (str facebook-files-path "/"))))))
+       (specter/transform ALL (fn [o] (->> o ts/children first ts/attributes :src (str @facebook-files-path "/"))))))
        ;; (specter/select [ALL #(string/starts-with? % (str facebook-files-path "/messages/photos"))])))
 
 (defn copy-thread-images-to-folder [threads folder-name]
