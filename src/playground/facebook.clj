@@ -54,10 +54,11 @@
 
 (def facebook-files-path (atom "/home/victor/Documents/fb"))
 (defn set-facebook-path [p] (reset! facebook-files-path p))
-(def f (io/file @facebook-files-path))
 
-(def fs (file-seq f))
+#_(def f (io/file @facebook-files-path))
 
+#_(def fs (file-seq f))
+(declare fs)
 (defn get-class [n]
   (:class
    (ts/attributes n)))
@@ -181,7 +182,7 @@
     (and (string/includes? p "/messages/")
          (string/ends-with? p ".html"))))
 
-(def sample-message-file (->> fs
+#_(def sample-message-file (->> fs
                               (filter is-message-file?)
                               (map ts/parse)
                               first))
