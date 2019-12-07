@@ -54,11 +54,10 @@
 
 (def facebook-files-path (atom "/home/victor/Documents/fb"))
 (defn set-facebook-path [p] (reset! facebook-files-path p))
+(def f (io/file @facebook-files-path))
 
-#_(def f (io/file @facebook-files-path))
+(def fs (file-seq f))
 
-#_(def fs (file-seq f))
-(declare fs)
 (defn get-class [n]
   (:class
    (ts/attributes n)))
@@ -325,7 +324,8 @@
         rows (for [[k vs] idx] {:name k :files (limiter (string/join ", " vs)) :file-count (count vs)})]
     (clojure.pprint/print-table (sort-by :name rows))))
 
-(def message-index (read-message-index))
+(declare message-index)
+#_(def message-index (read-message-index))
 
 (defn get-message-threads [name]
   (let [paths (get message-index name)]
