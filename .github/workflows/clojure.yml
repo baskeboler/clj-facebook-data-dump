@@ -13,3 +13,9 @@ jobs:
       run: lein deps
     - name: Run tests
       run: lein test
+    - name: build jar
+      run: lein uberjar
+    - uses: actions/upload-artifact@v1
+      with:
+        name: fb-cli
+        path: target/uberjar
